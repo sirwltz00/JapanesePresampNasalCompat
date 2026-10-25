@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>JapanesePresampNasalCompat</AssemblyName>
+    <RootNamespace>OpenUtau.Plugin.JapanesePresampNasalCompat</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../OpenUtau/OpenUtau.Core/OpenUtau.Core.csproj" />
+    <ProjectReference Include="../OpenUtau/OpenUtau.Plugin.Builtin/OpenUtau.Plugin.Builtin.csproj" />
+  </ItemGroup>
+</Project>
