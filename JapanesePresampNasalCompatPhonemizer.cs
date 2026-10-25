@@ -438,9 +438,13 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
                     foreach (var pair in presamp.Replace) {
                         if (pair.Key == lyric) {
                             lyric = pair.Value;
+                            break;
                         }
                     }
                 }
+
+                if (lyric == "wo") {
+                    lyric = "を";
             }
             return lyric;
         }
