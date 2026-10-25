@@ -35,7 +35,7 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
 
         static readonly Dictionary<string, string> substituteLookup;
 
-        static JapanesePresampPhonemizer() {
+        static JapanesePresampNasalCompatPhonemizer() {
             substituteLookup = substitution.ToList()
                 .SelectMany(line => {
                     var parts = line.Split('=');
