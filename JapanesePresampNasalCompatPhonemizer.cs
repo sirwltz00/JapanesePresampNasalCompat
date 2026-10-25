@@ -445,6 +445,7 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
 
                 if (lyric == "wo") {
                     lyric = "を";
+                }
             }
             return lyric;
         }
