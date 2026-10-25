@@ -10,7 +10,7 @@ using OpenUtau.Core;
 //using Serilog;
 
 namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
-    [Phonemizer("Japanese Presamp Nasal Compat", "JA NASAL", "WaltzさんP", language: "JA")]
+    [Phonemizer("Japanese Presamp Nasal Compat", "JA VCV/CVVC (EXTRA)", "Waltz", language: "JA")]
     public class JapanesePresampNasalCompatPhonemizer : Phonemizer {
 
         // CV, VCV, CVVCを含むすべての日本語VBをサポートする予定です。Will support all Japanese VBs including CV, VCV, CVVC
@@ -35,7 +35,7 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
 
         static readonly Dictionary<string, string> substituteLookup;
 
-        static JapanesePresampNasalCompatPhonemizer() {
+        static JapanesePresampPhonemizer() {
             substituteLookup = substitution.ToList()
                 .SelectMany(line => {
                     var parts = line.Split('=');
@@ -464,7 +464,10 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
         // Returns ン before velars (k/g series) and ン2 before bilabials (p/b/m series).
         // For other consonants, leave the lyric unchanged and let ordinary alias fallback apply.
         private string GetNasalVariantForNext(Note? next) {
-            if (next == null || !string.IsNullOrEmpty(next.Value.phoneticHint)) {
+            if (next == null) {
+                return "ン";
+            }
+            if (!string.IsNullOrEmpty(next.Value.phoneticHint)) {
                 return null;
             }
             var nextLyric = ParseLyricFromNote(next.Value);
