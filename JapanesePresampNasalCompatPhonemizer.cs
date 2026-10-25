@@ -10,7 +10,7 @@ using OpenUtau.Core;
 //using Serilog;
 
 namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
-    [Phonemizer("Japanese Presamp Nasal Compat", "JA VCV/CVVC (EXTRA NASALS)", "Waltz", language: "JA")]
+    [Phonemizer("Japanese Presamp Nasal Compat", "JA VCV/CVVC (EXTRAS)", "WaltzさんP", language: "JA")]
     public class JapanesePresampNasalCompatPhonemizer : Phonemizer {
 
         // CV, VCV, CVVCを含むすべての日本語VBをサポートする予定です。Will support all Japanese VBs including CV, VCV, CVVC
