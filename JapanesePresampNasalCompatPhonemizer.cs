@@ -10,7 +10,7 @@ using OpenUtau.Core;
 //using Serilog;
 
 namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
-    [Phonemizer("Japanese Presamp Nasal Compat", "JA NASAL", "Waltz", language: "JA")]
+    [Phonemizer("Japanese Presamp Nasal Compat", "JA NASAL", "WaltzさんP", language: "JA")]
     public class JapanesePresampNasalCompatPhonemizer : Phonemizer {
 
         // CV, VCV, CVVCを含むすべての日本語VBをサポートする予定です。Will support all Japanese VBs including CV, VCV, CVVC
@@ -35,7 +35,7 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
 
         static readonly Dictionary<string, string> substituteLookup;
 
-        static JapanesePresampPhonemizer() {
+        static JapanesePresampNasalCompatPhonemizer() {
             substituteLookup = substitution.ToList()
                 .SelectMany(line => {
                     var parts = line.Split('=');
