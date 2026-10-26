@@ -1,4 +1,4 @@
-name: Build Japanese Presamp Nasal Compat
+name: Build Kanata Warutsu Phonemizer
 
 on:
   workflow_dispatch:
@@ -36,7 +36,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: JapanesePresampNasalCompat
-          path: bin/Release/net10.0/JapanesePresampNasalCompat.dll
+          path: bin/Release/net10.0/KanataWarutsuPhonemizer.dll
           if-no-files-found: error
 
       - name: Upload build log on failure
