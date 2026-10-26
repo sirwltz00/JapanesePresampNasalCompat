@@ -433,6 +433,11 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
             if (!string.IsNullOrEmpty(note.phoneticHint)) {
                 lyric = note.phoneticHint.Normalize();
             } else {
+
+                if (lyric == "wo") {
+                    return = "を";
+                }
+                
                 // replace (exact match)
                 if (presamp.Replace != null) {
                     foreach (var pair in presamp.Replace) {
@@ -442,12 +447,8 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
                         }
                     }
                 }
-
-                if (lyric == "wo") {
-                    lyric = "を";
-                }
-            }
-            return lyric;
+                
+                return lyric;
         }
 
         private string ParseAliasFromLyric(string lyric) {
