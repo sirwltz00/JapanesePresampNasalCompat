@@ -35,7 +35,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: JapanesePresampNasalCompat
+          name: KanataWarutsuPhonemizer
           path: bin/Release/net10.0/KanataWarutsuPhonemizer.dll
           if-no-files-found: error
 
