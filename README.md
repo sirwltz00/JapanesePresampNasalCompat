@@ -1,4 +1,4 @@
-# Japanese Presamp Extras (OpenUtau)
+# Kanata Warutsu Phonemizer (OpenUtau)
 
 This repository builds a separately distributed OpenUtau phonemizer DLL using GitHub Actions, so a Windows PC is not required locally.
 
