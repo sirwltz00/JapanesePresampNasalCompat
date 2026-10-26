@@ -536,7 +536,7 @@ namespace OpenUtau.Plugin.KanataWarutsuPhonemizer {
             ["fa"]="ふぁ", ["fi"]="ふぃ", ["fe"]="ふぇ", ["fo"]="ふぉ",
             ["va"]="ゔぁ", ["vi"]="ゔぃ", ["vu"]="ゔ", ["ve"]="ゔぇ", ["vo"]="ゔぉ",
             ["xya"]="ゃ", ["xyu"]="ゅ", ["xyo"]="ょ", ["lya"]="ゃ", ["lyu"]="ゅ", ["lyo"]="ょ",
-            ["xtsu"]="っ", ["ltsu"]="っ", ["xtu"]="っ", ["ltu"]="っ",
+            ["xtsu"]="っ", ["ltsu"]="っ", ["xtu"]="っ", ["ltu"]="っ", ["s"]="s", ["sh"]="sh", ["S"]="S", ["z"]="z", ["Z"]="Z", ["zh"]="zh",
         };
 
         private static readonly string[] romajiMoraPatterns = romajiMoraMap.Keys
