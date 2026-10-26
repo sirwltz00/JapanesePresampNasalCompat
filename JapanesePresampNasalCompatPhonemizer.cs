@@ -10,7 +10,7 @@ using OpenUtau.Core;
 //using Serilog;
 
 namespace OpenUtau.Plugin.KanataWarutsuPhonemizer {
-    [Phonemizer("Kanata Warutsu Phonemizer", "JA VCV/CVVC (EXTRAS)", "WaltzさんP", language: "JA")]
+    [Phonemizer("Kanata Warutsu Phonemizer", "JA VCV & CVVC+", "WaltzさんP", language: "JA")]
     public class KanataWarutsuPhonemizer : Phonemizer {
 
         // CV, VCV, CVVCを含むすべての日本語VBをサポートする予定です。Will support all Japanese VBs including CV, VCV, CVVC
