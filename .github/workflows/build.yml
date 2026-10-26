@@ -29,7 +29,7 @@ jobs:
 
       - name: Build plugin
         shell: pwsh
-        run: dotnet build JapanesePresampNasalCompat.csproj --configuration Release --verbosity minimal
+        run: dotnet build KanataWarutsuPhonemizer.csproj --configuration Release --verbosity minimal
 
       - name: Upload DLL artifact
         if: success()
