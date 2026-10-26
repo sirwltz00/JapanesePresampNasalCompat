@@ -82,6 +82,86 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
         }
 
         public override Result Process(Note[] notes, Note? prev, Note? next, Note? prevNeighbour, Note? nextNeighbour, Note[] prevNeighbours) {
+            // OpenUtau passes the lyric note together with its '+' extender notes.
+            // If the lyric contains multiple Japanese morae, split it across that group
+            // and run the existing VCV/CVVC logic for each generated mora.
+            if (notes != null && notes.Length > 0
+                && string.IsNullOrEmpty(notes[0].phoneticHint)
+                && TrySplitMultiMoraLyric(notes[0].lyric, out var morae)
+                && morae.Count > 1) {
+                return ProcessMultiMora(notes, morae, prev, next, prevNeighbour, nextNeighbour, prevNeighbours);
+            }
+            return ProcessSingleMora(notes, prev, next, prevNeighbour, nextNeighbour, prevNeighbours);
+        }
+
+        private Result ProcessMultiMora(Note[] notes, List<string> morae, Note? prev, Note? next,
+            Note? prevNeighbour, Note? nextNeighbour, Note[] prevNeighbours) {
+            int groupStart = notes[0].position;
+            int baseCount = morae.Count / notes.Length;
+            int extraCount = morae.Count % notes.Length;
+            int moraIndex = 0;
+            var virtualNotes = new List<Note>();
+
+            // Distribute morae as evenly as possible across the lyric note and its extenders.
+            // Each real note's duration is then divided evenly among the morae assigned to it.
+            for (int noteIndex = 0; noteIndex < notes.Length; noteIndex++) {
+                var source = notes[noteIndex];
+                int count = baseCount + (noteIndex < extraCount ? 1 : 0);
+                if (count == 0) {
+                    continue;
+                }
+                for (int j = 0; j < count; j++) {
+                    int start = source.position + (int)((long)source.duration * j / count);
+                    int end = source.position + (int)((long)source.duration * (j + 1) / count);
+                    virtualNotes.Add(new Note {
+                        lyric = morae[moraIndex++],
+                        phoneticHint = null,
+                        tone = source.tone,
+                        position = start,
+                        duration = Math.Max(1, end - start),
+                        phonemeAttributes = source.phonemeAttributes,
+                    });
+                }
+            }
+
+            var combined = new List<Phoneme>();
+            for (int i = 0; i < virtualNotes.Count; i++) {
+                var current = virtualNotes[i];
+                Note? previousVirtual = i > 0 ? virtualNotes[i - 1] : (Note?)null;
+                Note? followingVirtual = i + 1 < virtualNotes.Count ? virtualNotes[i + 1] : (Note?)null;
+                Note? localPrev = previousVirtual ?? prev;
+                Note? localNext = followingVirtual ?? next;
+                Note? localPrevNeighbour = previousVirtual ?? prevNeighbour;
+                Note? localNextNeighbour = followingVirtual ?? nextNeighbour;
+                Note[] localPrevNeighbours = previousVirtual.HasValue
+                    ? new Note[] { previousVirtual.Value }
+                    : prevNeighbours;
+
+                var single = ProcessSingleMora(new Note[] { current }, localPrev, localNext,
+                    localPrevNeighbour, localNextNeighbour, localPrevNeighbours);
+                int offset = current.position - groupStart;
+                for (int phonemeIndex = 0; phonemeIndex < single.phonemes.Length; phonemeIndex++) {
+                    var phoneme = single.phonemes[phonemeIndex];
+                    phoneme.position += offset;
+                    combined.Add(phoneme);
+                }
+            }
+
+            // A multi-mora group can contain more phonemes than the original 0/1/2 slots.
+            // Sort by time and assign unique indexes for the combined result.
+            var ordered = combined
+                .Select((phoneme, order) => new { phoneme, order })
+                .OrderBy(item => item.phoneme.position)
+                .ThenBy(item => item.order)
+                .Select(item => item.phoneme)
+                .ToArray();
+            for (int i = 0; i < ordered.Length; i++) {
+                ordered[i].index = i;
+            }
+            return new Result { phonemes = ordered };
+        }
+
+        private Result ProcessSingleMora(Note[] notes, Note? prev, Note? next, Note? prevNeighbour, Note? nextNeighbour, Note[] prevNeighbours) {
             var result = new List<Phoneme>();
             bool preCFlag = false;
 
@@ -428,6 +508,145 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
             return false;
         }
 
+        private static readonly Dictionary<string, string> romajiMoraMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+            ["a"]="あ", ["i"]="い", ["u"]="う", ["e"]="え", ["o"]="お",
+            ["ka"]="か", ["ki"]="き", ["ku"]="く", ["ke"]="け", ["ko"]="こ",
+            ["ga"]="が", ["gi"]="ぎ", ["gu"]="ぐ", ["ge"]="げ", ["go"]="ご",
+            ["sa"]="さ", ["shi"]="し", ["si"]="し", ["shu"]="しゅ", ["syu"]="しゅ", ["sha"]="しゃ", ["sya"]="しゃ", ["sho"]="しょ", ["syo"]="しょ", ["su"]="す", ["se"]="せ", ["so"]="そ",
+            ["za"]="ざ", ["ji"]="じ", ["zi"]="じ", ["ju"]="じゅ", ["zyu"]="じゅ", ["ja"]="じゃ", ["zya"]="じゃ", ["jo"]="じょ", ["zyo"]="じょ", ["zu"]="ず", ["ze"]="ぜ", ["zo"]="ぞ",
+            ["ta"]="た", ["chi"]="ち", ["ti"]="ち", ["tsu"]="つ", ["tu"]="つ", ["te"]="て", ["to"]="と",
+            ["da"]="だ", ["di"]="ぢ", ["du"]="づ", ["de"]="で", ["do"]="ど",
+            ["na"]="な", ["ni"]="に", ["nu"]="ぬ", ["ne"]="ね", ["no"]="の",
+            ["ha"]="は", ["hi"]="ひ", ["fu"]="ふ", ["hu"]="ふ", ["he"]="へ", ["ho"]="ほ",
+            ["ba"]="ば", ["bi"]="び", ["bu"]="ぶ", ["be"]="べ", ["bo"]="ぼ",
+            ["pa"]="ぱ", ["pi"]="ぴ", ["pu"]="ぷ", ["pe"]="ぺ", ["po"]="ぽ",
+            ["ma"]="ま", ["mi"]="み", ["mu"]="む", ["me"]="め", ["mo"]="も",
+            ["ya"]="や", ["yu"]="ゆ", ["yo"]="よ",
+            ["ra"]="ら", ["ri"]="り", ["ru"]="る", ["re"]="れ", ["ro"]="ろ",
+            ["wa"]="わ", ["wi"]="うぃ", ["we"]="うぇ", ["wo"]="を",
+            ["kya"]="きゃ", ["kyu"]="きゅ", ["kyo"]="きょ", ["gya"]="ぎゃ", ["gyu"]="ぎゅ", ["gyo"]="ぎょ",
+            ["jya"]="じゃ", ["jyu"]="じゅ", ["jyo"]="じょ",
+            ["cha"]="ちゃ", ["chu"]="ちゅ", ["cho"]="ちょ", ["tya"]="ちゃ", ["tyu"]="ちゅ", ["tyo"]="ちょ",
+            ["nya"]="にゃ", ["nyu"]="にゅ", ["nyo"]="にょ", ["hya"]="ひゃ", ["hyu"]="ひゅ", ["hyo"]="ひょ",
+            ["bya"]="びゃ", ["byu"]="びゅ", ["byo"]="びょ", ["pya"]="ぴゃ", ["pyu"]="ぴゅ", ["pyo"]="ぴょ",
+            ["mya"]="みゃ", ["myu"]="みゅ", ["myo"]="みょ", ["rya"]="りゃ", ["ryu"]="りゅ", ["ryo"]="りょ",
+            ["kwa"]="くぁ", ["kwi"]="くぃ", ["kwu"]="くぅ", ["kwe"]="くぇ", ["kwo"]="くぉ",
+            ["gwa"]="ぐぁ", ["gwi"]="ぐぃ", ["gwu"]="ぐぅ", ["gwe"]="ぐぇ", ["gwo"]="ぐぉ",
+            ["tsa"]="つぁ", ["tsi"]="つぃ", ["tse"]="つぇ", ["tso"]="つぉ",
+            ["fa"]="ふぁ", ["fi"]="ふぃ", ["fe"]="ふぇ", ["fo"]="ふぉ",
+            ["va"]="ゔぁ", ["vi"]="ゔぃ", ["vu"]="ゔ", ["ve"]="ゔぇ", ["vo"]="ゔぉ",
+            ["xya"]="ゃ", ["xyu"]="ゅ", ["xyo"]="ょ", ["lya"]="ゃ", ["lyu"]="ゅ", ["lyo"]="ょ",
+            ["xtsu"]="っ", ["ltsu"]="っ", ["xtu"]="っ", ["ltu"]="っ",
+        };
+
+        private static readonly string[] romajiMoraPatterns = romajiMoraMap.Keys
+            .OrderByDescending(key => key.Length)
+            .ToArray();
+
+        private bool TrySplitMultiMoraLyric(string lyric, out List<string> morae) {
+            morae = new List<string>();
+            if (string.IsNullOrEmpty(lyric) || lyric.Any(char.IsWhiteSpace)) {
+                return false;
+            }
+            string normalized = lyric.Normalize();
+            string hiragana = ConvertKatakanaToHiragana(normalized);
+            if (hiragana.All(IsKanaMoraCharacter)) {
+                morae = SplitKanaMorae(hiragana);
+                return morae.Count > 0;
+            }
+
+            var parsed = new List<string>();
+            int position = 0;
+            while (position < normalized.Length) {
+                // A doubled consonant is a small っ, except for 'nn', where the first n is ん.
+                if (position + 1 < normalized.Length
+                    && char.ToLowerInvariant(normalized[position]) == char.ToLowerInvariant(normalized[position + 1])
+                    && IsRomajiConsonant(normalized[position])
+                    && char.ToLowerInvariant(normalized[position]) != 'n') {
+                    parsed.Add("っ");
+                    position++;
+                    continue;
+                }
+                if (char.ToLowerInvariant(normalized[position]) == 'n'
+                    && position + 1 < normalized.Length
+                    && (normalized[position + 1] == '\'' || normalized[position + 1] == '’')) {
+                    parsed.Add("ん");
+                    position += 2;
+                    continue;
+                }
+
+                string match = romajiMoraPatterns.FirstOrDefault(pattern =>
+                    position + pattern.Length <= normalized.Length
+                    && string.Compare(normalized, position, pattern, 0, pattern.Length, StringComparison.OrdinalIgnoreCase) == 0);
+                if (match != null) {
+                    string mapped;
+                    // Respect custom presamp replacements where available; otherwise use the built-in kana mapping.
+                    bool hasCustomReplace = presamp?.Replace != null && presamp.Replace.Any(pair => pair.Key == match);
+                    if (hasCustomReplace || string.Equals(match, "wo", StringComparison.OrdinalIgnoreCase)) {
+                        mapped = match;
+                    } else {
+                        mapped = romajiMoraMap[match];
+                    }
+                    parsed.Add(mapped);
+                    position += match.Length;
+                    continue;
+                }
+
+                // 'n' before a consonant or at the end is the moraic nasal.
+                if (char.ToLowerInvariant(normalized[position]) == 'n'
+                    && (position + 1 == normalized.Length
+                        || !IsRomajiVowel(normalized[position + 1]))) {
+                    parsed.Add("ん");
+                    position++;
+                    continue;
+                }
+                return false;
+            }
+            morae = parsed;
+            return morae.Count > 0;
+        }
+
+        private static List<string> SplitKanaMorae(string lyric) {
+            var morae = new List<string>();
+            foreach (char ch in lyric) {
+                string value = ch.ToString();
+                if (IsSmallKana(ch) && morae.Count > 0) {
+                    morae[morae.Count - 1] += value;
+                } else if (ch == 'ー' && morae.Count > 0) {
+                    morae[morae.Count - 1] += value;
+                } else {
+                    morae.Add(value);
+                }
+            }
+            return morae;
+        }
+
+        private static string ConvertKatakanaToHiragana(string value) {
+            var chars = value.ToCharArray();
+            for (int i = 0; i < chars.Length; i++) {
+                if (chars[i] >= 'ァ' && chars[i] <= 'ヶ') {
+                    chars[i] = (char)(chars[i] - 0x60);
+                }
+            }
+            return new string(chars);
+        }
+
+        private static bool IsKanaMoraCharacter(char ch) {
+            return (ch >= 'ぁ' && ch <= 'ゖ') || ch == 'ー' || IsSmallKana(ch);
+        }
+
+        private static bool IsSmallKana(char ch) {
+            return "ぁぃぅぇぉゃゅょゎゕゖ".Contains(ch);
+        }
+
+        private static bool IsRomajiVowel(char ch) {
+            return "aiueoAIUEO".Contains(ch);
+        }
+
+        private static bool IsRomajiConsonant(char ch) {
+            return char.IsLetter(ch) && !IsRomajiVowel(ch);
+        }
+
         private string ParseLyricFromNote(Note note) {
             var lyric = note.lyric.Normalize(); // Normalize(): measures for Unicode
             if (!string.IsNullOrEmpty(note.phoneticHint)) {
@@ -435,7 +654,7 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
             } else {
 
                 if (lyric == "wo") {
-                    return  "を";
+                    return "を";
                 }
                 
                 // replace (exact match)
