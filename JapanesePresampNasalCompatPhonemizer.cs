@@ -435,7 +435,7 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
             } else {
 
                 if (lyric == "wo") {
-                    return = "を";
+                    return  "を";
                 }
                 
                 // replace (exact match)
@@ -447,8 +447,8 @@ namespace OpenUtau.Plugin.JapanesePresampNasalCompat {
                         }
                     }
                 }
-                
-                return lyric;
+            }
+            return lyric;
         }
 
         private string ParseAliasFromLyric(string lyric) {
