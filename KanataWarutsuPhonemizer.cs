@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Security.Cryptography;
 using Classic;
 using OpenUtau.Api;
 using OpenUtau.Core.Ustx;
@@ -42,8 +43,11 @@ namespace OpenUtau.Plugin.KanataWarutsuPhonemizer {
             @"^(?<base>.+)(?<suffix> RR(?<index>[0-9]+))$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private const int MaxRrSelectionsPerAlias = 512;
+        // Look at a short run of earlier selections for this alias. Recent-use weighting
+        // reduces obvious clusters while preserving a genuine random choice each time.
+        private const int RecentRrWindow = 6;
         private readonly object rrLock = new object();
-        private readonly Random rrRandom = new Random();
+        private readonly Random rrRandom = CreateRrRandom();
         private Dictionary<string, List<RrVariant>> rrVariantsByBase = new Dictionary<string, List<RrVariant>>(StringComparer.Ordinal);
         private readonly Dictionary<string, SortedDictionary<int, RrSelection>> rrSelectionsByBase =
             new Dictionary<string, SortedDictionary<int, RrSelection>>(StringComparer.Ordinal);
@@ -686,7 +690,7 @@ namespace OpenUtau.Plugin.KanataWarutsuPhonemizer {
 
                 if (history.TryGetValue(notePosition, out var cached)
                     && availableIndices.Contains(cached.Index)) {
-                    // Memoization makes editor refreshes and render retries stable for this note.
+                    // Keep refreshes and render retries stable for the same note.
                     return cached.Index;
                 }
 
@@ -708,8 +712,8 @@ namespace OpenUtau.Plugin.KanataWarutsuPhonemizer {
                         choices = withoutPrevious;
                     }
                 }
-                // When filling/recalculating notes out of order, also avoid colliding with
-                // the next cached note whenever that can be done without repeating the prior index.
+                // Notes can be processed out of order. Avoid matching the next cached note
+                // as well whenever that is possible without forcing a previous-note repeat.
                 if (nextIndex.HasValue && choices.Count > 1) {
                     var withoutNext = choices.Where(index => index != nextIndex.Value).ToList();
                     if (withoutNext.Count > 0) {
@@ -717,12 +721,68 @@ namespace OpenUtau.Plugin.KanataWarutsuPhonemizer {
                     }
                 }
 
-                long selected = choices[rrRandom.Next(choices.Count)];
+                // Plain per-note random picks can form conspicuous short loops (for example,
+                // A-B-A-B) even with immediate repeats blocked. Count the last few selections
+                // for this alias and give less-recently-used RR indices a higher probability.
+                // This is deliberately weighted, not a strict shuffle bag: every remaining
+                // choice still has a chance, so the result does not become a fixed cycle.
+                var recentCounts = availableIndices.ToDictionary(index => index, index => 0);
+                int examined = 0;
+                foreach (var pair in history.Reverse()) {
+                    if (pair.Key >= notePosition) {
+                        continue;
+                    }
+                    if (examined >= RecentRrWindow) {
+                        break;
+                    }
+                    examined++;
+                    if (recentCounts.ContainsKey(pair.Value.Index)) {
+                        recentCounts[pair.Value.Index]++;
+                    }
+                }
+
+                var weightedChoices = new List<KeyValuePair<long, double>>();
+                double totalWeight = 0.0;
+                foreach (long index in choices) {
+                    int recentUses = recentCounts.TryGetValue(index, out int count) ? count : 0;
+                    // Inverse-square-ish weighting favours variety without making the
+                    // sequence deterministic. A never/recently-unused variant weighs most.
+                    double weight = 1.0 / Math.Pow(1.0 + recentUses, 1.5);
+                    weightedChoices.Add(new KeyValuePair<long, double>(index, weight));
+                    totalWeight += weight;
+                }
+
+                double roll = rrRandom.NextDouble() * totalWeight;
+                long selected = weightedChoices[weightedChoices.Count - 1].Key;
+                foreach (var weightedChoice in weightedChoices) {
+                    roll -= weightedChoice.Value;
+                    if (roll < 0.0) {
+                        selected = weightedChoice.Key;
+                        break;
+                    }
+                }
+
                 history[notePosition] = new RrSelection { Index = selected };
                 while (history.Count > MaxRrSelectionsPerAlias) {
                     history.Remove(history.Keys.First());
                 }
                 return selected;
+            }
+        }
+
+        private static Random CreateRrRandom() {
+            // Random() alone can receive similar time-based seeds when multiple phonemizers
+            // are created quickly. Seed it from the platform RNG to make each instance's
+            // random stream independent. Selection itself remains fast and runs under rrLock.
+            try {
+                using (var generator = RandomNumberGenerator.Create()) {
+                    var seedBytes = new byte[4];
+                    generator.GetBytes(seedBytes);
+                    return new Random(BitConverter.ToInt32(seedBytes, 0));
+                }
+            } catch {
+                // Defensive fallback for unusual runtimes where the platform RNG is unavailable.
+                return new Random(unchecked(Environment.TickCount * 397 ^ Guid.NewGuid().GetHashCode()));
             }
         }
 
